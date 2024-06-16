@@ -4,15 +4,17 @@ from flask_restx import Api
 
 from flask_migrate import Migrate
 
-from .duenos.views import duenos_namespace
-from .discotecas.views import discotecas_namespace
+from .users.views import user_namespace
+from .clubs.views import club_namespace
+from .events.views import event_namespace
 
 from .config.config import config_dict
 
 from .utils import db
 
-from .models.duenos import Dueno
-from .models.discotecas import Discoteca
+from .models.users import User
+from .models.clubs import Club
+from .models.events import Event
 
 
 
@@ -27,15 +29,17 @@ def create_app(config=config_dict['dev']):
 
     api = Api(app)
 
-    api.add_namespace(duenos_namespace, path='/duenos')
-    api.add_namespace(discotecas_namespace, path='/discotecas')
+    api.add_namespace(user_namespace, path='/users')
+    api.add_namespace(club_namespace, path='/clubs')
+    api.add_namespace(event_namespace, path='/events')
 
     @app.shell_context_processor
     def make_shell_context():
         return {
             'db' : db,
-            'Dueno' : Dueno,
-            'Discoteca' : Discoteca
+            'User' : User,
+            'Club' : Club,
+            'Event' : Event
         }
 
     return app
