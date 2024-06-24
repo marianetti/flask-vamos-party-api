@@ -1,7 +1,7 @@
 from flask import Flask
 
 from flask_restx import Api
-
+from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 
 from .users.views import user_namespace
@@ -16,6 +16,11 @@ from .models.users import User
 from .models.clubs import Club
 from .models.events import Event
 
+from werkzeug.exceptions import (
+    NotFound,
+    MethodNotAllowed
+)
+
 
 
 def create_app(config=config_dict['dev']):
@@ -25,13 +30,28 @@ def create_app(config=config_dict['dev']):
 
     db.init_app(app)
 
+    jwt = JWTManager(app)
     migrate = Migrate(app, db)
 
     api = Api(app)
 
+
     api.add_namespace(user_namespace, path='/users')
     api.add_namespace(club_namespace, path='/clubs')
     api.add_namespace(event_namespace, path='/events')
+
+    @api.errorhandler(NotFound)
+    def not_found(error):
+        return {
+            'error' : 'Not Found'
+        }, 404
+    
+    @api.errorhandler(MethodNotAllowed)
+    def method_not_allowed(error):
+        return {
+            'error' : 'Method Not Allowed'
+        }, 405
+
 
     @app.shell_context_processor
     def make_shell_context():

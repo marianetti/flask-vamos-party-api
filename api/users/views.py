@@ -3,13 +3,17 @@ from flask_restx import (
     Resource, 
     fields 
 )
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    jwt_required,
+    get_jwt_identity
+)
 from flask import (
-    request, 
-    jsonify
+    request
 )
 
 from ..models.users import User
-from ..utils import db
 
 from werkzeug.security import (
     generate_password_hash, 
@@ -23,7 +27,7 @@ create_user_model = user_namespace.model(
     'User', {
         'id' : fields.Integer(),
         'name' : fields.String(required=True, description="Name of user"),
-        'user' : fields.String(required=True, description="Username"),
+        'username' : fields.String(required=True, description="Username"),
         'password_hash' : fields.String(required=True, description="User password"),
         'email' : fields.String(required=True, description="User email")
     }
@@ -40,21 +44,71 @@ return_user_model = user_namespace.model(
     'User', {
         'id' : fields.Integer(),
         'name' : fields.String(required=True, description="Name of user"),
-        'user' : fields.String(required=True, description="Username"),
+        'username' : fields.String(required=True, description="Username"),
         'password_hash' : fields.String(required=True, description="User password"),
         'email' : fields.String(required=True, description="User email")
     }
 )
 
-@user_namespace.route('/users')
+login_user_model = user_namespace.model(
+    'Login', {
+        'email' : fields.String(requires=True, description='Email for login'),
+        'password' : fields.String(required=True, description='Password for login')
+    }
+)
+
+
+@user_namespace.route('/login')
+class Login(Resource):
+
+    @user_namespace.expect(login_user_model)
+    def post(self):
+
+        data = request.get_json()
+
+        email = data.get('email')
+        password = data.get('password')
+
+        user = User.query.filter_by(email=email).first()
+
+        if (user is not None) and (check_password_hash(user.password_hash, password)):
+            access_token = create_access_token(identity=user.username)
+            refresh_token = create_refresh_token(identity=user.username)
+
+            response={
+                'access_token':access_token,
+                'refresh_token':refresh_token
+            }
+
+            return response, HTTPStatus.OK
+        
+
+
+@user_namespace.route('/refresh')
+class Refresh(Resource):
+    
+    @jwt_required(refresh=True)
+    def post(self):
+        username = get_jwt_identity()
+
+        access_token = create_access_token(identity=username)
+
+        return {
+            'access_token' : access_token
+        }, HTTPStatus.OK
+
+
+@user_namespace.route('/')
 class GetCreate(Resource):
     """
         Get all users
     """
+    @user_namespace.marshal_with(return_user_model)
+    @jwt_required()
     def get(self):
         try:
             users = User.query.all()
-            return jsonify([user.json() for user in users], HTTPStatus.OK)
+            return users, HTTPStatus.OK
             
         except:
             return HTTPStatus.INTERNAL_SERVER_ERROR
@@ -64,34 +118,36 @@ class GetCreate(Resource):
     """
     @user_namespace.expect(create_user_model)
     @user_namespace.marshal_with(return_user_model)
+    @jwt_required()
     def post(self):
         try:
-            data = request.get_json()
+            data = user_namespace.payload
             new_user = User(
                 name=data['name'], 
-                user=data['user'], 
-                password_hash=generate_password_hash(data['password']), 
+                username=data['username'], 
+                password_hash=generate_password_hash(data['password_hash']), 
                 email=data['email']
             )
-            
             new_user.save()
 
-            return jsonify(new_user, HTTPStatus.CREATED)
+            return new_user, HTTPStatus.CREATED
         
         except:
             return HTTPStatus.INTERNAL_SERVER_ERROR
 
-@user_namespace.route('/user/<int:id>')
+@user_namespace.route('/user/<int:user_id>')
 class GetUpdateDelete(Resource):
 
     """
         Get user by id
     """
-    def get(self, id):
+    @user_namespace.marshal_with(return_user_model)
+    @jwt_required()
+    def get(self, user_id):
         try:
-            user = User.query.filter_by(id=id).first()
+            user = User.query.filter_by(id=user_id).first()
             if user:
-                return jsonify({'user' : user.json()}, HTTPStatus.OK)
+                return user, HTTPStatus.OK
             else:
                 return HTTPStatus.NOT_FOUND
         except:
@@ -101,24 +157,26 @@ class GetUpdateDelete(Resource):
         Update user by id
     """
     @user_namespace.expect(update_user_model)
-    @user_namespace.marshal(return_user_model)
-    def put(self, id):
+    @user_namespace.marshal_with(return_user_model)
+    @jwt_required()
+    def put(self, user_id):
         try:
-            user = User.query.filter_by(id=id).first()
+            user = User.query.filter_by(id=user_id).first()
             if user:
                 data = request.get_json()
                 user.name = data['name']
                 user.email = data['email']
                 user.update()
-                return jsonify(user, HTTPStatus.OK)
+                return  user, HTTPStatus.OK
             else:
                 return HTTPStatus.NOT_FOUND
         except:
             return HTTPStatus.INTERNAL_SERVER_ERROR
 
-    def delete(self, id):
+    @jwt_required()
+    def delete(self, user_id):
         try:
-            user = User.query.filter_by(id=id).first()
+            user = User.query.filter_by(id=user_id).first()
             if user:
                 user.delete()
                 return HTTPStatus.OK

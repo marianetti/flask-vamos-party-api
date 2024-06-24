@@ -3,12 +3,17 @@ from flask_restx import (
     Resource,
     fields
 )
+from flask_jwt_extended import (
+    jwt_required,
+    get_jwt_identity
+)
 from flask import (
     request,
     jsonify
 )
 
 from ..models.clubs import Club
+from ..models.users import User
 from ..utils import db
 
 from http import HTTPStatus
@@ -18,7 +23,7 @@ club_namespace = Namespace('clubs', description="namespace for clubs")
 create_club_model = club_namespace.model(
     'Club', {
         'id' : fields.Integer(),
-        'user_id' : fields.Integer(required=True, description="Club owner"),
+        'user' : fields.Integer(description="Club owner"),
         'name' : fields.String(required=True, description="Club name"),
         'address' : fields.String(required=True, description="Club address"),
         'instagram' : fields.String(required=False, description="Club instagram")
@@ -36,22 +41,24 @@ update_club_model = club_namespace.model(
 return_club_model = club_namespace.model(
     'Club', {
         'id' : fields.Integer(),
-        'user_id' : fields.Integer(required=True, description="Club owner"),
+        'user' : fields.Integer(required=True, description="Club owner"),
         'name' : fields.String(required=True, description="Club name"),
         'address' : fields.String(required=True, description="Club address"),
         'instagram' : fields.String(required=False, description="Club instagram")
     }
 )
 
-@club_namespace.route('/clubs')
+@club_namespace.route('/')
 class GetCreate(Resource):
     """
         Return all clubs
     """
+    @club_namespace.marshal_with(return_club_model)
+    @jwt_required()
     def get(self):
         try:
             clubs = Club.query.all()
-            return jsonify([club.json() for club in clubs]), HTTPStatus.OK
+            return clubs, HTTPStatus.OK
         except:
             return HTTPStatus.INTERNAL_SERVER_ERROR
 
@@ -60,32 +67,39 @@ class GetCreate(Resource):
     """
     @club_namespace.expect(create_club_model)
     @club_namespace.marshal_with(return_club_model)
+    @jwt_required()
     def post(self):
-        try:
-            data = request.get_json()
-            new_club = Club(
-                user_id=data['user_id'],
-                name=data['name'],
-                address=data['address'],
-                instagram=data['instagram']
-            )
+        # try:
+        data = club_namespace.payload
 
-            new_club.save()
-            return jsonify(new_club, HTTPStatus.CREATED)
-        except:
-            return HTTPStatus.INTERNAL_SERVER_ERROR
+        username = get_jwt_identity()
+        current_user = User.query.filter_by(username=username).first()
+        new_club = Club(
+            name=data['name'],
+            address=data['address'],
+            instagram=data['instagram'],
+            #user=data['user']
+        )
+        new_club.users = current_user
+        new_club.save()
+        return new_club, HTTPStatus.CREATED
         
-@club_namespace.route('/clubs/<int:id>')
+        # except Exception as e:
+        #     return e, HTTPStatus.INTERNAL_SERVER_ERROR
+        
+@club_namespace.route('/clubs/<int:club_id>')
 class GetUpdateDelete(Resource):
 
     """
         Get club by id
     """
-    def get(self, id):
+    @club_namespace.marshal_with(return_club_model)
+    @jwt_required()
+    def get(self, club_id):
         try: 
-            club = Club.query.filter_by(id=id).first()
+            club = Club.query.filter_by(id=club_id).first()
             if club:
-                return jsonify({'club' : club.json()}, HTTPStatus.OK)
+                return club, HTTPStatus.OK
             else:
                 return HTTPStatus.NOT_FOUND
         except:
@@ -95,16 +109,17 @@ class GetUpdateDelete(Resource):
     """
     @club_namespace.expect(update_club_model)
     @club_namespace.marshal_with(return_club_model)
-    def put(self, id):
+    @jwt_required()
+    def put(self, club_id):
         try:
-            club = Club.query.filter_by(id=id).first()
+            club = Club.query.filter_by(id=club_id).first()
             if club:
-                data = request.get_json()
+                data = club_namespace.payload
                 club.name = data['name']
                 club.address = data['address']
                 club.instagram = data['instagram']
                 club.update()
-                return jsonify(club, HTTPStatus.OK)
+                return club, HTTPStatus.OK
             else:
                 return HTTPStatus.NOT_FOUND
         except:
@@ -113,9 +128,10 @@ class GetUpdateDelete(Resource):
     """
         Delete club by id
     """
-    def delete(self, id):
+    @jwt_required()
+    def delete(self, club_id):
         try:
-            club = Club.query.filter_by(id=id).first()
+            club = Club.query.filter_by(id=club_id).first()
             if club:
                 club.delete()
                 return HTTPStatus.OK
