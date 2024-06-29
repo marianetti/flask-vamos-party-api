@@ -73,7 +73,7 @@ class GetCreate(Resource):
         data = club_namespace.payload
 
         username = get_jwt_identity()
-        current_user = User.query.filter_by(username=username).first()
+        current_user = User.query.filter_by(username=username).first_or_404()
         new_club = Club(
             name=data['name'],
             address=data['address'],
@@ -97,7 +97,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def get(self, club_id):
         try: 
-            club = Club.query.filter_by(id=club_id).first()
+            club = Club.get_by_id(id=club_id)
             if club:
                 return club, HTTPStatus.OK
             else:
@@ -112,7 +112,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def put(self, club_id):
         try:
-            club = Club.query.filter_by(id=club_id).first()
+            club = Club.get_by_id(id=club_id)
             if club:
                 data = club_namespace.payload
                 club.name = data['name']
@@ -131,7 +131,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def delete(self, club_id):
         try:
-            club = Club.query.filter_by(id=club_id).first()
+            club = Club.get_by_id(id=club_id)
             if club:
                 club.delete()
                 return HTTPStatus.OK

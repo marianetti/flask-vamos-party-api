@@ -81,9 +81,9 @@ class GetCreate(Resource):
         data = event_namespace.payload
 
         username = get_jwt_identity()
-        current_user = User.query.filter_by(username=username).first()
-        current_club = Club.query.filter_by(user=current_user.id).first()
-        print(current_club)
+        current_user = User.query.filter_by(username=username).first_or_404()
+        current_club = Club.query.filter_by(user=current_user.id).first_or_404()
+        
 
         new_event = Event(
             name=data['name'],
@@ -122,7 +122,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def put(self, event_id):
         try:
-            event = Event.query.filter_by(id=event_id).first()
+            event = Event.get_by_id(id=event_id)
             if event:
                 data = event_namespace.payload
                 event.name = data['name']
@@ -144,7 +144,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def delete(self, event_id):
         try:
-            event = Event.query.filter_by(id=id).first()
+            event = Event.get_by_id(id=event_id)
             if event:
                 event.delete()
                 return HTTPStatus.OK

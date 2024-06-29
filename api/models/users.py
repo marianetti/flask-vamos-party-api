@@ -9,7 +9,7 @@ class User(db.Model):
     name = db.Column(db.String(80), nullable=False)
     username = db.Column(db.String(20), unique=True, nullable=False)
     password_hash = db.Column(db.String(20), unique=False, nullable=False)
-    email = db.Column(db.String(50), unique=False, nullable=False)
+    email = db.Column(db.String(50), unique=True, nullable=False)
     date_created = db.Column(db.DateTime(), default=datetime.utcnow)
     clubs = db.relationship('Club', backref='users', lazy=True)
 
@@ -36,5 +36,9 @@ class User(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
+
+    def get_by_id(cls, id):
+        return cls.query.get_or_404(id)
+
 
 

@@ -19,6 +19,10 @@ from werkzeug.security import (
     generate_password_hash, 
     check_password_hash
 )
+from werkzeug.exceptions import (
+    Conflict,
+    BadRequest
+)
 from http import HTTPStatus
 
 user_namespace = Namespace('users', description="namespace for users")
@@ -81,6 +85,8 @@ class Login(Resource):
             }
 
             return response, HTTPStatus.OK
+
+        raise BadRequest("Invalid Username or Password")
         
 
 
@@ -145,7 +151,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def get(self, user_id):
         try:
-            user = User.query.filter_by(id=user_id).first()
+            user = User.get_by_id(id=user_id)
             if user:
                 return user, HTTPStatus.OK
             else:
@@ -161,7 +167,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def put(self, user_id):
         try:
-            user = User.query.filter_by(id=user_id).first()
+            user = User.get_by_id(id=user_id)
             if user:
                 data = request.get_json()
                 user.name = data['name']
@@ -176,7 +182,7 @@ class GetUpdateDelete(Resource):
     @jwt_required()
     def delete(self, user_id):
         try:
-            user = User.query.filter_by(id=user_id).first()
+            user = User.get_by_id(id=user_id)
             if user:
                 user.delete()
                 return HTTPStatus.OK
