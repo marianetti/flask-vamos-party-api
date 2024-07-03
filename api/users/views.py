@@ -61,6 +61,10 @@ login_user_model = user_namespace.model(
     }
 )
 
+@user_namespace.route('/health')
+class HealthCheck(Resource):
+    def get(self):
+        return HTTPStatus.OK
 
 @user_namespace.route('/login')
 class Login(Resource):
